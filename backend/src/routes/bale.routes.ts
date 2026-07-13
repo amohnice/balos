@@ -33,7 +33,7 @@ router.get('/', requireBusinessPermission(BusinessActions.BALES_READ), async (re
 router.post('/', requireBusinessPermission(BusinessActions.BALES_CREATE), async (req: AuthRequest, res: Response): Promise<void> => {
   const businessId = req.params.businessId as string;
   try {
-    const { supplierId, referenceNo, grade, purchasePrice, weightKg, notes } = req.body;
+    const { supplierId, baleNumber, purchasePrice, weightKg, description } = req.body;
     if (!purchasePrice || typeof purchasePrice !== 'number' || purchasePrice < 0) {
       res.status(400).json({ success: false, error: 'Valid purchasePrice is required.' });
       return;
@@ -43,11 +43,10 @@ router.post('/', requireBusinessPermission(BusinessActions.BALES_CREATE), async 
       data: {
         businessId,
         supplierId: supplierId || undefined,
-        referenceNo: referenceNo || undefined,
-        grade: grade || 'MIXED',
+        baleNumber: baleNumber || undefined,
         purchasePrice,
         weightKg: weightKg || undefined,
-        notes: notes || undefined,
+        description: description || undefined,
         status: 'ARRIVED',
       },
       include: { supplier: true },
@@ -85,12 +84,12 @@ router.patch('/:baleId', requireBusinessPermission(BusinessActions.BALES_UPDATE)
   const businessId = req.params.businessId as string;
   const baleId = req.params.baleId as string;
   try {
-    const { status, notes } = req.body;
+    const { status, description } = req.body;
     const updated = await prisma.bale.updateMany({
       where: { id: baleId, businessId },
       data: {
         ...(status && { status, ...(status === 'SORTING' && { openedAt: new Date() }) }),
-        ...(notes !== undefined && { notes }),
+        ...(description !== undefined && { description }),
       },
     });
     if (updated.count === 0) { res.status(404).json({ success: false, error: 'Bale not found.' }); return; }

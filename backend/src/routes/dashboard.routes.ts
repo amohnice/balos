@@ -69,7 +69,7 @@ router.get('/', requireBusinessPermission(BusinessActions.SALES_READ), async (re
     const pendingCategoriesList = await prisma.baleCategory.findMany({
       where: { businessId, status: 'PENDING' },
       include: {
-        bale: { select: { referenceNo: true } },
+        bale: { select: { baleNumber: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 5,

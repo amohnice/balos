@@ -24,13 +24,6 @@ enum BusinessRole {
   CASHIER
 }
 
-enum BaleGrade {
-  A
-  B
-  C
-  MIXED
-}
-
 enum BaleStatus {
   ARRIVED   // Purchased, not yet opened
   SORTING   // Being sorted
@@ -123,12 +116,11 @@ model Bale {
   id            String         @id @default(uuid())
   businessId    String
   supplierId    String?
-  referenceNo   String?
-  grade         BaleGrade      @default(MIXED)
+  baleNumber    String?
   purchasePrice Float
   weightKg      Float?
   status        BaleStatus     @default(ARRIVED)
-  notes         String?
+  description   String?
   purchasedAt   DateTime       @default(now())
   openedAt      DateTime?
   createdAt     DateTime       @default(now())

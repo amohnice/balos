@@ -117,7 +117,7 @@ router.get('/active-categories', requireBusinessPermission(BusinessActions.SALES
         businessId,
         status: { in: ['APPROVED', 'CLEARANCE'] },
       },
-      include: { bale: { select: { id: true, referenceNo: true } } },
+      include: { bale: { select: { id: true, baleNumber: true } } },
       orderBy: { name: 'asc' },
     });
     res.json({ success: true, data: categories });

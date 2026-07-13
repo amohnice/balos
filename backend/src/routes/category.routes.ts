@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { authenticate, type AuthRequest } from '../middleware/auth.middleware.js';
-import { requireBusinessPermission } from '../middleware/role.middleware.js';
+import { requireBusinessPermission, requireBalePermission, requireCategoryPermission } from '../middleware/role.middleware.js';
 import { BusinessActions } from '../lib/permissions.js';
 
 const router = Router({ mergeParams: true });
@@ -24,7 +24,7 @@ router.get('/', requireBusinessPermission(BusinessActions.BALES_READ), async (re
 });
 
 // ── POST /api/bales/:baleId/categories ────────────────────────────────────────
-router.post('/', requireBusinessPermission(BusinessActions.CATEGORIES_CREATE), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/', requireBalePermission(BusinessActions.CATEGORIES_CREATE), async (req: AuthRequest, res: Response): Promise<void> => {
   const baleId = req.params.baleId as string;
   try {
     const { name, description, gender, itemType, quantity, basePrice, pricingMode } = req.body;
@@ -35,6 +35,13 @@ router.post('/', requireBusinessPermission(BusinessActions.CATEGORIES_CREATE), a
 
     const bale = await prisma.bale.findUnique({ where: { id: baleId } });
     if (!bale) { res.status(404).json({ success: false, error: 'Bale not found.' }); return; }
+
+    // Check if user has approval permission (owner/manager) for auto-approval
+    const membership = await prisma.businessMember.findUnique({
+      where: { businessId_userId: { businessId: bale.businessId, userId: req.user!.userId } },
+    });
+
+    const canAutoApprove = membership && (membership.role === 'OWNER' || membership.role === 'MANAGER');
 
     const category = await prisma.baleCategory.create({
       data: {
@@ -48,8 +55,12 @@ router.post('/', requireBusinessPermission(BusinessActions.CATEGORIES_CREATE), a
         basePrice,
         currentPrice: basePrice,
         pricingMode: pricingMode || 'FLEXIBLE',
-        status: 'PENDING',
+        status: canAutoApprove ? 'APPROVED' : 'PENDING',
         proposedBy: req.user!.userId,
+        ...(canAutoApprove && {
+          approvedBy: req.user!.userId,
+          approvedAt: new Date(),
+        }),
       },
     });
     res.status(201).json({ success: true, data: category });
@@ -59,7 +70,7 @@ router.post('/', requireBusinessPermission(BusinessActions.CATEGORIES_CREATE), a
 });
 
 // ── PATCH /api/categories/:id/approve ────────────────────────────────────────
-router.patch('/:id/approve', requireBusinessPermission(BusinessActions.CATEGORIES_APPROVE), async (req: AuthRequest, res: Response): Promise<void> => {
+router.patch('/:id/approve', requireCategoryPermission(BusinessActions.CATEGORIES_APPROVE), async (req: AuthRequest, res: Response): Promise<void> => {
   const id = req.params.id as string;
   try {
     const category = await prisma.baleCategory.update({
