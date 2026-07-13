@@ -1,0 +1,217 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Platform-Level Enums ──────────────────────────────────────────────────────
+
+enum SystemRole {
+  SUPER_ADMIN
+  OWNER
+}
+
+enum BusinessRole {
+  OWNER
+  MANAGER
+  SORTER
+  CASHIER
+}
+
+enum BaleGrade {
+  A
+  B
+  C
+  MIXED
+}
+
+enum BaleStatus {
+  ARRIVED   // Purchased, not yet opened
+  SORTING   // Being sorted
+  ACTIVE    // On sale
+  CLEARED   // Fully cleared
+}
+
+enum CategoryStatus {
+  PENDING   // Proposed by sorter, awaiting approval
+  APPROVED  // Live and on sale
+  CLEARANCE // Marked down / on discount
+  CLOSED    // Out of stock / closed
+}
+
+enum PricingMode {
+  FLEXIBLE  // Min price set; seller can go higher
+  FIXED     // Exact price; no deviation allowed
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String           @id @default(uuid())
+  email        String           @unique
+  name         String
+  passwordHash String
+  phone        String?
+  systemRole   SystemRole       @default(OWNER)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  memberships  BusinessMember[]
+  sales        Sale[]
+
+  @@index([email])
+}
+
+model Business {
+  id          String           @id @default(uuid())
+  name        String
+  description String?
+  location    String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  members     BusinessMember[]
+  suppliers   Supplier[]
+  bales       Bale[]
+  sales       Sale[]
+
+  @@index([name])
+}
+
+model BusinessMember {
+  id           String       @id @default(uuid())
+  businessId   String
+  userId       String
+  role         BusinessRole
+  isActive     Boolean      @default(true)
+  joinedAt     DateTime     @default(now())
+
+  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
+  @@index([businessId])
+  @@index([userId])
+}
+
+model Supplier {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  phone      String?
+  email      String?
+  location   String?
+  notes      String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  bales      Bale[]
+
+  @@index([businessId])
+}
+
+model Bale {
+  id            String         @id @default(uuid())
+  businessId    String
+  supplierId    String?
+  referenceNo   String?
+  grade         BaleGrade      @default(MIXED)
+  purchasePrice Float
+  weightKg      Float?
+  status        BaleStatus     @default(ARRIVED)
+  notes         String?
+  purchasedAt   DateTime       @default(now())
+  openedAt      DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplier      Supplier?      @relation(fields: [supplierId], references: [id])
+  categories    BaleCategory[]
+
+  @@index([businessId, status])
+  @@index([businessId, createdAt])
+}
+
+model BaleCategory {
+  id           String         @id @default(uuid())
+  baleId       String
+  businessId   String
+  name         String         // e.g. "Men's Shirts"
+  description  String?
+  gender       String?        // MALE, FEMALE, KIDS, UNISEX
+  itemType     String?        // SHIRT, TROUSER, DRESS, SHOES, etc.
+  quantity     Int            // Estimated items in this category
+  soldCount    Int            @default(0)
+  basePrice    Float          // Base/minimum price per item
+  currentPrice Float          // Current price (changes after markdowns)
+  pricingMode  PricingMode    @default(FLEXIBLE)
+  status       CategoryStatus @default(PENDING)
+  proposedBy   String?        // userId of sorter
+  approvedBy   String?        // userId of manager/owner
+  approvedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  bale         Bale           @relation(fields: [baleId], references: [id], onDelete: Cascade)
+  saleItems    SaleItem[]
+  markdowns    PriceMarkdown[]
+
+  @@index([baleId])
+  @@index([businessId, status])
+}
+
+model Sale {
+  id            String     @id @default(uuid())
+  businessId    String
+  cashierId     String
+  totalAmount   Float
+  paymentMethod String     @default("CASH") // CASH | MPESA | CARD
+  notes         String?
+  createdAt     DateTime   @default(now())
+
+  business      Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  cashier       User       @relation(fields: [cashierId], references: [id])
+  items         SaleItem[]
+
+  @@index([businessId, createdAt])
+  @@index([cashierId])
+}
+
+model SaleItem {
+  id          String       @id @default(uuid())
+  saleId      String
+  categoryId  String
+  quantity    Int          @default(1)
+  unitPrice   Float        // Actual sale price per unit
+  totalPrice  Float        // quantity * unitPrice
+
+  sale        Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  category    BaleCategory @relation(fields: [categoryId], references: [id])
+
+  @@index([saleId])
+  @@index([categoryId])
+}
+
+model PriceMarkdown {
+  id         String       @id @default(uuid())
+  categoryId String
+  oldPrice   Float
+  newPrice   Float
+  reason     String?
+  appliedBy  String       // userId
+  createdAt  DateTime     @default(now())
+
+  category   BaleCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+}
