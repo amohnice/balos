@@ -139,7 +139,7 @@ router.post('/:businessId/members', requireBusinessPermission(BusinessActions.ME
       if (!user) {
         const passwordHash = await bcrypt.hash(password, 12);
         user = await tx.user.create({
-          data: { name: name.trim(), email: email.toLowerCase().trim(), passwordHash, systemRole: 'OWNER' },
+          data: { name: name.trim(), email: email.toLowerCase().trim(), passwordHash, systemRole: 'MEMBER' },
         });
       }
 

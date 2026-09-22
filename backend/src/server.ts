@@ -7,6 +7,7 @@ import businessRoutes from './routes/business.routes.js';
 import supplierRoutes from './routes/supplier.routes.js';
 import baleRoutes from './routes/bale.routes.js';
 import categoryRoutes from './routes/category.routes.js';
+import categoryItemRoutes from './routes/categoryItem.routes.js';
 import salesRoutes from './routes/sales.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 
@@ -19,7 +20,7 @@ app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 
 // Health Check Route
-app.get('/health', (_req, res) => {
+app.get('/health', (req, res) => {
   res.json({ status: 'Balos Backend is running!' });
 });
 
@@ -31,10 +32,10 @@ app.use('/api/businesses/:businessId/bales', baleRoutes);
 app.use('/api/businesses/:businessId/sales', salesRoutes);
 app.use('/api/businesses/:businessId/dashboard', dashboardRoutes);
 app.use('/api/bales/:baleId/categories', categoryRoutes);
-app.use('/api/categories', categoryRoutes);
+app.use('/api/categories', categoryItemRoutes);
 
 // Global Error Handler
-app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('[Unhandled Error]:', err);
   res.status(500).json({
     success: false,

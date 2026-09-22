@@ -165,6 +165,11 @@ export const api = {
       apiRequest<unknown>(`/categories/${id}/approve`, {
         method: 'PATCH',
       }),
+    updatePrice: (id: string, data: { newPrice: number; reason?: string }) =>
+      apiRequest<unknown>(`/categories/${id}/price`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     markdown: (id: string, data: { newPrice: number; reason?: string }) =>
       apiRequest<unknown>(`/categories/${id}/markdown`, {
         method: 'PATCH',

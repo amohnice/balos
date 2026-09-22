@@ -44,6 +44,8 @@ const permissionsMap: Record<BusinessRole, string[]> = {
     BusinessActions.BALES_READ,
     BusinessActions.BALES_CREATE,
     BusinessActions.CATEGORIES_CREATE,
+    BusinessActions.SALES_READ,
+    BusinessActions.SUPPLIERS_READ,
   ],
   CASHIER: [BusinessActions.SALES_CREATE, BusinessActions.SALES_READ, BusinessActions.BALES_READ],
 };

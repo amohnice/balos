@@ -85,10 +85,11 @@ export function requireBalePermission(action: string) {
     let businessId = req.params.businessId as string | undefined;
 
     // If no businessId in params, try to get it from baleId
-    if (!businessId && req.params.baleId) {
+    const baleId = req.params.baleId as string | undefined;
+    if (!businessId && baleId) {
       try {
         const bale = await prisma.bale.findUnique({
-          where: { id: req.params.baleId },
+          where: { id: baleId },
           select: { businessId: true },
         });
         if (bale) {
@@ -139,10 +140,11 @@ export function requireCategoryPermission(action: string) {
     let businessId = req.params.businessId as string | undefined;
 
     // If no businessId in params, try to get it from category id
-    if (!businessId && req.params.id) {
+    const categoryId = req.params.id as string | undefined;
+    if (!businessId && categoryId) {
       try {
         const category = await prisma.baleCategory.findUnique({
-          where: { id: req.params.id },
+          where: { id: categoryId },
           select: { businessId: true },
         });
         if (category) {

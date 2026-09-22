@@ -41,7 +41,10 @@ export default function RegisterPage() {
       }
 
       // Save user with the created business membership
-      login(res.data.token, { ...res.data.user, businesses: res.data.business ? [res.data.business] : [] });
+      login(res.data.token, {
+        ...res.data.user,
+        businesses: res.data.business ? [res.data.business as import('@/lib/auth').StoredBusiness] : [],
+      });
       router.push('/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Registration failed');

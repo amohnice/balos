@@ -17,7 +17,7 @@ export type User = StoredUser;
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (token: string, user: { id: string; email: string; name: string; systemRole: string; businesses: unknown[] }) => void;
+  login: (token: string, user: User) => void;
   logout: () => void;
   updateUser: (user: User) => void;
   isAuthenticated: boolean;

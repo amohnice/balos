@@ -27,7 +27,10 @@ export default function LoginPage() {
       }
 
       // Store user + business memberships for client-side permission checks
-      login(res.data.token, {...res.data.user, businesses: res.data.businesses ?? []});
+      login(res.data.token, {
+        ...res.data.user,
+        businesses: (res.data.businesses as import('@/lib/auth').StoredBusiness[]) ?? [],
+      });
       router.push('/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed');

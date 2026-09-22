@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ActiveBusinessProvider } from "@/contexts/ActiveBusinessContext";
+import { ToastProvider } from "@/contexts/ToastContext";
 import React from "react";
 
 const geistSans = Geist({
@@ -31,7 +33,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <ActiveBusinessProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </ActiveBusinessProvider>
+        </AuthProvider>
       </body>
     </html>
   );

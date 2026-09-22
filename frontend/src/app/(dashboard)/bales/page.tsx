@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useActiveBusiness } from '@/contexts/ActiveBusinessContext';
+import { useToast } from '@/contexts/ToastContext';
 import { api } from '@/lib/api';
-import { getFirstBusinessId } from '@/lib/business';
-import { Card, CardHeader, CardContent } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -15,9 +15,9 @@ import { Spinner } from '@/components/ui/Spinner';
 import RequireRole from '@/components/RequireRole';
 
 export default function BalesPage() {
-  const { user } = useAuth();
   const router = useRouter();
-  const [businessId, setBusinessId] = useState<string | null>(null);
+  const { activeBusinessId: businessId } = useActiveBusiness();
+  const { toast } = useToast();
   const [bales, setBales] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,35 +34,30 @@ export default function BalesPage() {
   });
   const [formData, setFormData] = useState({
     supplierId: '',
-    baleNumber: '',
+    referenceNo: '',
     purchasePrice: '',
     weightKg: '',
-    description: '',
+    notes: '',
   });
 
   useEffect(() => {
-    if (user) {
-      api.businesses.list().then((res: any) => {
-        const id = getFirstBusinessId(res.data);
-        if (id) {
-          setBusinessId(id);
-        }
-      });
+    if (!businessId) {
+      setLoading(false);
+      return;
     }
-  }, [user]);
 
-  useEffect(() => {
-    if (businessId) {
-      Promise.all([
-        api.bales.list(businessId),
-        api.suppliers.list(businessId),
-      ]).then(([balesRes, suppliersRes]: any[]) => {
+    setLoading(true);
+    Promise.all([api.bales.list(businessId), api.suppliers.list(businessId)])
+      .then(([balesRes, suppliersRes]: any[]) => {
         setBales(balesRes.data || []);
         setSuppliers(suppliersRes.data || []);
         setLoading(false);
-      }).catch(() => setLoading(false));
-    }
-  }, [businessId]);
+      })
+      .catch((err) => {
+        toast(err.message || 'Failed to fetch bales data', 'error');
+        setLoading(false);
+      });
+  }, [businessId, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,15 +73,16 @@ export default function BalesPage() {
       setShowModal(false);
       setFormData({
         supplierId: '',
-        baleNumber: '',
+        referenceNo: '',
         purchasePrice: '',
         weightKg: '',
-        description: '',
+        notes: '',
       });
-      // Refresh bales
-      api.bales.list(businessId).then((res: any) => setBales(res.data || []));
+      toast('Bale created successfully', 'success');
+      const res = await api.bales.list(businessId);
+      setBales(res.data || []);
     } catch (err: any) {
-      alert(err.message || 'Failed to create bale');
+      toast(err.message || 'Failed to create bale', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -113,13 +109,12 @@ export default function BalesPage() {
       await api.suppliers.create(businessId, supplierFormData);
       setShowSupplierModal(false);
       setSupplierFormData({ name: '', phone: '', email: '', location: '', notes: '' });
-      // Refresh suppliers and reopen bale modal
-      api.suppliers.list(businessId).then((res: any) => {
-        setSuppliers(res.data || []);
-        setShowModal(true);
-      });
+      toast('Supplier created successfully', 'success');
+      const res = await api.suppliers.list(businessId);
+      setSuppliers(res.data || []);
+      setShowModal(true);
     } catch (err: any) {
-      alert(err.message || 'Failed to create supplier');
+      toast(err.message || 'Failed to create supplier', 'error');
     } finally {
       setIsSubmittingSupplier(false);
     }
@@ -129,9 +124,10 @@ export default function BalesPage() {
     if (!businessId) return;
     try {
       await api.bales.update(businessId, baleId, { status: 'SORTING' });
+      toast('Sorting started for bale', 'info');
       router.push(`/bales/${baleId}`);
     } catch (err: any) {
-      alert(err.message || 'Failed to start sorting');
+      toast(err.message || 'Failed to start sorting', 'error');
     }
   };
 
@@ -141,46 +137,63 @@ export default function BalesPage() {
         <Spinner size="md" className="text-gray-900" />
       </div>
     );
-  if (!businessId) return <div className="p-4">No business found</div>;
+
+  if (!businessId) return <div className="p-6 text-gray-500">No active business selected.</div>;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-light text-gray-900 tracking-tight">Bales</h1>
-        <RequireRole businessId={businessId ?? undefined} businessRoles={["OWNER", "MANAGER", "SORTER"]}>
-          <Button onClick={handleOpenModal}>Add Bale</Button>
+        <div>
+          <h1 className="text-2xl font-light text-gray-900 tracking-tight">Bales Inventory</h1>
+          <p className="text-sm text-gray-500">Track bale arrivals, sorting stages, and category breakdowns</p>
+        </div>
+        <RequireRole businessId={businessId ?? undefined} businessRoles={['OWNER', 'MANAGER', 'SORTER']}>
+          <Button onClick={handleOpenModal}>+ Add Bale</Button>
         </RequireRole>
       </div>
 
-      <div className="grid gap-4">
-        {bales.map((bale) => (
-          <Card key={bale.id}>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-semibold text-gray-900">{bale.baleNumber || 'No Bale Number'}</p>
-                  <p className="text-sm text-gray-500">Supplier: {bale.supplier?.name || 'Unknown'}</p>
-                  <p className="text-sm text-gray-500">Price: KES {bale.purchasePrice.toLocaleString()}</p>
-                </div>
-                <Badge variant={bale.status === 'ARRIVED' ? 'success' : bale.status === 'SORTING' ? 'warning' : 'default'}>
-                  {bale.status}
-                </Badge>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <Button size="sm" variant="secondary" onClick={() => router.push(`/bales/${bale.id}`)}>
-                  View Details
-                </Button>
-                {bale.status === 'ARRIVED' && (
-                  <RequireRole businessId={businessId ?? undefined} businessRoles={["OWNER", "MANAGER"]}>
-                    <Button size="sm" onClick={() => handleStartSorting(bale.id)}>
-                      Start Sorting
-                    </Button>
-                  </RequireRole>
-                )}
-              </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {bales.length === 0 ? (
+          <Card className="col-span-full">
+            <CardContent className="p-8 text-center text-gray-500">
+              No bales recorded for this business yet.
             </CardContent>
           </Card>
-        ))}
+        ) : (
+          bales.map((bale) => (
+            <Card key={bale.id} className="hover:shadow-md transition border-gray-200 flex flex-col justify-between">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900 text-lg">
+                      {bale.referenceNo || bale.baleNumber || 'Ref N/A'}
+                    </p>
+                    <p className="text-xs text-gray-500">Supplier: {bale.supplier?.name || 'Unknown'}</p>
+                    {bale.weightKg && <p className="text-xs text-gray-500">Weight: {bale.weightKg} kg</p>}
+                  </div>
+                  <Badge variant={bale.status === 'ARRIVED' ? 'success' : bale.status === 'SORTING' ? 'warning' : 'default'}>
+                    {bale.status}
+                  </Badge>
+                </div>
+                <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+                  <span className="text-sm font-bold text-gray-900">KES {bale.purchasePrice?.toLocaleString()}</span>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => router.push(`/bales/${bale.id}`)}>
+                      View Details
+                    </Button>
+                    {bale.status === 'ARRIVED' && (
+                      <RequireRole businessId={businessId ?? undefined} businessRoles={['OWNER', 'MANAGER']}>
+                        <Button size="sm" onClick={() => handleStartSorting(bale.id)}>
+                          Sort
+                        </Button>
+                      </RequireRole>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add New Bale">
@@ -206,9 +219,10 @@ export default function BalesPage() {
             </Select>
           </div>
           <Input
-            label="Bale Number"
-            value={formData.baleNumber}
-            onChange={(e) => setFormData({ ...formData, baleNumber: e.target.value })}
+            label="Reference / Serial Number"
+            value={formData.referenceNo}
+            onChange={(e) => setFormData({ ...formData, referenceNo: e.target.value })}
+            placeholder="e.g. BAL-2026-001"
           />
           <Input
             label="Purchase Price (KES)"
@@ -218,19 +232,22 @@ export default function BalesPage() {
             value={formData.purchasePrice}
             onChange={(e) => setFormData({ ...formData, purchasePrice: e.target.value })}
             required
+            placeholder="45000"
           />
           <Input
             label="Weight (kg)"
             type="number"
             value={formData.weightKg}
             onChange={(e) => setFormData({ ...formData, weightKg: e.target.value })}
+            placeholder="45"
           />
           <Input
-            label="Description"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            label="Notes / Description"
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            placeholder="First camera grade jackets"
           />
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <Button type="submit" className="w-full py-2.5" disabled={isSubmitting}>
             {isSubmitting ? 'Creating...' : 'Create Bale'}
           </Button>
         </form>
