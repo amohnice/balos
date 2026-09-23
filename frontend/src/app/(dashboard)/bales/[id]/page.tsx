@@ -161,6 +161,37 @@ export default function BaleDetailPage() {
         </Button>
       </div>
 
+      {/* Bale Lifecycle Stepper */}
+      <div className="p-4 bg-gray-50 border border-gray-200/80 rounded-xl space-y-2">
+        <div className="flex justify-between items-center text-xs font-semibold text-gray-500">
+          <span>Bale Lifecycle Progress</span>
+          <span className="uppercase text-indigo-600 tracking-wider">Status: {bale.status}</span>
+        </div>
+        <div className="grid grid-cols-4 gap-2 text-center text-xs font-medium">
+          {['ARRIVED', 'SORTING', 'ACTIVE', 'CLEARED'].map((st, idx) => {
+            const stepOrder = ['ARRIVED', 'SORTING', 'ACTIVE', 'CLEARED'];
+            const currentIdx = stepOrder.indexOf(bale.status);
+            const isCompleted = idx <= currentIdx;
+            const isCurrent = idx === currentIdx;
+
+            return (
+              <div
+                key={st}
+                className={`py-2 px-1 rounded-lg border transition ${
+                  isCurrent
+                    ? 'bg-gray-900 text-white border-gray-900 shadow-sm font-bold'
+                    : isCompleted
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-white text-gray-400 border-gray-200'
+                }`}
+              >
+                {idx + 1}. {st.charAt(0) + st.slice(1).toLowerCase()}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <Card>
         <CardContent className="p-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

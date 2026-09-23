@@ -160,39 +160,75 @@ export default function BalesPage() {
             </CardContent>
           </Card>
         ) : (
-          bales.map((bale) => (
-            <Card key={bale.id} className="hover:shadow-md transition border-gray-200 flex flex-col justify-between">
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900 text-lg">
-                      {bale.referenceNo || bale.baleNumber || 'Ref N/A'}
-                    </p>
-                    <p className="text-xs text-gray-500">Supplier: {bale.supplier?.name || 'Unknown'}</p>
-                    {bale.weightKg && <p className="text-xs text-gray-500">Weight: {bale.weightKg} kg</p>}
+          bales.map((bale) => {
+            const totalItems = bale.categories?.reduce((s: number, c: any) => s + (c.quantity || 0), 0) || 0;
+            const totalSold = bale.categories?.reduce((s: number, c: any) => s + (c.soldCount || 0), 0) || 0;
+            const percentSold = totalItems > 0 ? Math.min(100, Math.round((totalSold / totalItems) * 100)) : 0;
+
+            const badgeVariant =
+              bale.status === 'ACTIVE'
+                ? 'success'
+                : bale.status === 'SORTING'
+                ? 'warning'
+                : bale.status === 'CLEARED'
+                ? 'info'
+                : 'default';
+
+            return (
+              <Card key={bale.id} className="hover:shadow-md transition border-gray-200 flex flex-col justify-between">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-900 text-lg">
+                        {bale.referenceNo || bale.baleNumber || 'Ref N/A'}
+                      </p>
+                      <p className="text-xs text-gray-500">Supplier: {bale.supplier?.name || 'Unknown'}</p>
+                      {bale.weightKg && <p className="text-xs text-gray-500">Weight: {bale.weightKg} kg</p>}
+                    </div>
+                    <Badge variant={badgeVariant}>{bale.status}</Badge>
                   </div>
-                  <Badge variant={bale.status === 'ARRIVED' ? 'success' : bale.status === 'SORTING' ? 'warning' : 'default'}>
-                    {bale.status}
-                  </Badge>
-                </div>
-                <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
-                  <span className="text-sm font-bold text-gray-900">KES {bale.purchasePrice?.toLocaleString()}</span>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => router.push(`/bales/${bale.id}`)}>
-                      View Details
-                    </Button>
-                    {bale.status === 'ARRIVED' && (
-                      <RequireRole businessId={businessId ?? undefined} businessRoles={['OWNER', 'MANAGER']}>
-                        <Button size="sm" onClick={() => handleStartSorting(bale.id)}>
-                          Sort
-                        </Button>
-                      </RequireRole>
-                    )}
+
+                  {/* Stock Sales Progress */}
+                  {totalItems > 0 && (
+                    <div className="space-y-1 pt-1">
+                      <div className="flex justify-between text-[11px] text-gray-500 font-medium">
+                        <span>Stock Sold ({totalSold}/{totalItems})</span>
+                        <span>{percentSold}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className={`h-1.5 rounded-full ${
+                            bale.status === 'CLEARED'
+                              ? 'bg-emerald-500'
+                              : percentSold > 50
+                              ? 'bg-indigo-600'
+                              : 'bg-amber-500'
+                          }`}
+                          style={{ width: `${percentSold}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+                    <span className="text-sm font-bold text-gray-900">KES {bale.purchasePrice?.toLocaleString()}</span>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => router.push(`/bales/${bale.id}`)}>
+                        View Details
+                      </Button>
+                      {bale.status === 'ARRIVED' && (
+                        <RequireRole businessId={businessId ?? undefined} businessRoles={['OWNER', 'MANAGER']}>
+                          <Button size="sm" onClick={() => handleStartSorting(bale.id)}>
+                            Sort
+                          </Button>
+                        </RequireRole>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
 

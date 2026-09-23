@@ -6,6 +6,7 @@ import { requireBusinessPermission } from '../middleware/role.middleware.js';
 import { BusinessActions } from '../lib/permissions.js';
 
 import { logActivity } from '../lib/activityLog.lib.js';
+import { updateBaleLifecycle } from '../lib/baleLifecycle.lib.js';
 
 const router = Router({ mergeParams: true });
 router.use(authenticate);
@@ -65,6 +66,8 @@ router.post('/', requireBusinessPermission(BusinessActions.SALES_CREATE), async 
     // Create sale with items in transaction
     const priceDeviations: string[] = [];
 
+    const affectedBaleIds = new Set<string>();
+
     const sale = await prisma.$transaction(async (tx) => {
       const newSale = await tx.sale.create({
         data: {
@@ -80,6 +83,10 @@ router.post('/', requireBusinessPermission(BusinessActions.SALES_CREATE), async 
         const { categoryId, quantity, unitPrice } = item;
         const cat = await tx.baleCategory.findUnique({ where: { id: categoryId as string } });
         const expectedPrice = cat?.currentPrice || unitPrice;
+
+        if (cat?.baleId) {
+          affectedBaleIds.add(cat.baleId);
+        }
 
         await tx.saleItem.create({
           data: {
@@ -107,6 +114,11 @@ router.post('/', requireBusinessPermission(BusinessActions.SALES_CREATE), async 
 
       return newSale;
     });
+
+    // Check affected bales for auto-clearing state transition
+    for (const baleId of affectedBaleIds) {
+      await updateBaleLifecycle(baleId);
+    }
 
     const saleWithItems = await prisma.sale.findUnique({
       where: { id: sale.id },

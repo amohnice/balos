@@ -6,6 +6,7 @@ import { requireBusinessPermission, requireBalePermission, requireCategoryPermis
 import { BusinessActions } from '../lib/permissions.js';
 
 import { logActivity } from '../lib/activityLog.lib.js';
+import { updateBaleLifecycle } from '../lib/baleLifecycle.lib.js';
 
 const router = Router({ mergeParams: true });
 router.use(authenticate);
@@ -74,6 +75,8 @@ router.post('/', requireBalePermission(BusinessActions.CATEGORIES_CREATE), async
       metadata: { categoryId: category.id, baleId, name: category.name, quantity, basePrice },
     });
 
+    await updateBaleLifecycle(baleId);
+
     res.status(201).json({ success: true, data: category });
   } catch (err: any) {
     res.status(500).json({ success: false, error: 'Failed to create category.', details: err?.message });
@@ -100,6 +103,8 @@ router.patch('/:id/approve', requireCategoryPermission(BusinessActions.CATEGORIE
       details: `Approved stock category "${category.name}" for sale`,
       metadata: { categoryId: category.id, name: category.name },
     });
+
+    await updateBaleLifecycle(category.baleId);
 
     res.json({ success: true, data: category });
   } catch (err: any) {
