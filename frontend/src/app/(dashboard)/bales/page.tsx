@@ -47,10 +47,10 @@ export default function BalesPage() {
     }
 
     setLoading(true);
-    Promise.all([api.bales.list(businessId), api.suppliers.list(businessId)])
-      .then(([balesRes, suppliersRes]: any[]) => {
+    api.bales
+      .list(businessId)
+      .then((balesRes: any) => {
         setBales(balesRes.data || []);
-        setSuppliers(suppliersRes.data || []);
         setLoading(false);
       })
       .catch((err) => {

@@ -17,7 +17,7 @@ export function getNavItems(user?: StoredUser | null) {
 
   const items = [
     { href: '/dashboard', label: 'Dashboard', Icon: DashboardIcon },
-    { href: '/bales', label: 'Bales', Icon: PackageIcon, roles: ['OWNER', 'MANAGER', 'SORTER', 'CASHIER'] },
+    { href: '/bales', label: 'Bales', Icon: PackageIcon, roles: ['OWNER', 'MANAGER', 'SORTER'] },
     { href: '/suppliers', label: 'Suppliers', Icon: SuppliersIcon, roles: ['OWNER', 'MANAGER'] },
     { href: '/sales/new', label: 'New Sale', Icon: SaleIcon, roles: ['OWNER', 'MANAGER', 'CASHIER'] },
     { href: '/sales/history', label: 'Sales History', Icon: HistoryIcon, roles: ['OWNER', 'MANAGER', 'CASHIER'] },
