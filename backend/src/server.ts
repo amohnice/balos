@@ -10,6 +10,7 @@ import categoryRoutes from './routes/category.routes.js';
 import categoryItemRoutes from './routes/categoryItem.routes.js';
 import salesRoutes from './routes/sales.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import activityRoutes from './routes/activity.routes.js';
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use('/api/businesses/:businessId/suppliers', supplierRoutes);
 app.use('/api/businesses/:businessId/bales', baleRoutes);
 app.use('/api/businesses/:businessId/sales', salesRoutes);
 app.use('/api/businesses/:businessId/dashboard', dashboardRoutes);
+app.use('/api/businesses/:businessId/activity-logs', activityRoutes);
 app.use('/api/bales/:baleId/categories', categoryRoutes);
 app.use('/api/categories', categoryItemRoutes);
 

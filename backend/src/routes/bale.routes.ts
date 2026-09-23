@@ -5,6 +5,8 @@ import { authenticate, type AuthRequest } from '../middleware/auth.middleware.js
 import { requireBusinessPermission } from '../middleware/role.middleware.js';
 import { BusinessActions } from '../lib/permissions.js';
 
+import { logActivity } from '../lib/activityLog.lib.js';
+
 const router = Router({ mergeParams: true });
 router.use(authenticate);
 
@@ -51,6 +53,15 @@ router.post('/', requireBusinessPermission(BusinessActions.BALES_CREATE), async 
       },
       include: { supplier: true },
     });
+
+    logActivity({
+      businessId,
+      userId: req.user!.userId,
+      action: 'BALE_CREATED',
+      details: `Registered new bale #${bale.baleNumber || bale.id.slice(0, 8)} (KES ${purchasePrice.toLocaleString()})`,
+      metadata: { baleId: bale.id, baleNumber: bale.baleNumber, purchasePrice },
+    });
+
     res.status(201).json({ success: true, data: bale });
   } catch (err: any) {
     res.status(500).json({ success: false, error: 'Failed to create bale.', details: err?.message });

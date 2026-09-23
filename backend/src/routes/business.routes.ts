@@ -6,6 +6,8 @@ import { authenticate, type AuthRequest } from '../middleware/auth.middleware.js
 import { requireBusinessPermission } from '../middleware/role.middleware.js';
 import { BusinessActions } from '../lib/permissions.js';
 
+import { logActivity } from '../lib/activityLog.lib.js';
+
 const router = Router();
 router.use(authenticate);
 
@@ -157,6 +159,14 @@ router.post('/:businessId/members', requireBusinessPermission(BusinessActions.ME
           data: { businessId, userId: user!.id, role },
         });
       }
+    });
+
+    logActivity({
+      businessId,
+      userId: req.user!.userId,
+      action: 'MEMBER_ADDED',
+      details: `Added staff member ${name} (${email}) as ${role}`,
+      metadata: { newUserId: user?.id, role },
     });
 
     res.status(201).json({ success: true, data: { message: 'Member added successfully.', userId: user?.id } });

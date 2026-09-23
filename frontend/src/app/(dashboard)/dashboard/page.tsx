@@ -16,15 +16,19 @@ export default function DashboardPage() {
   const { activeBusinessId: businessId, activeBusiness } = useActiveBusiness();
   const { toast } = useToast();
   const [data, setData] = useState<any>(null);
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [approvingId, setApprovingId] = useState<string | null>(null);
 
   const fetchDashboardData = (bizId: string) => {
     setLoading(true);
-    api.dashboard
-      .get(bizId)
-      .then((res: any) => {
-        setData(res.data);
+    Promise.all([
+      api.dashboard.get(bizId),
+      api.activityLogs.list(bizId).catch(() => ({ data: [] })),
+    ])
+      .then(([dashRes, logsRes]: [any, any]) => {
+        setData(dashRes.data);
+        setActivityLogs(logsRes.data || []);
         setLoading(false);
       })
       .catch((err) => {
@@ -52,6 +56,14 @@ export default function DashboardPage() {
     } finally {
       setApprovingId(null);
     }
+  };
+
+  const getActionBadgeVariant = (action: string) => {
+    if (action.includes('SALE')) return 'success';
+    if (action.includes('APPROVED')) return 'info';
+    if (action.includes('BALE')) return 'default';
+    if (action.includes('MEMBER')) return 'warning';
+    return 'default';
   };
 
   if (loading)
@@ -164,29 +176,62 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* Recent Sales */}
-        <Card>
-          <CardHeader className="border-b border-gray-100 pb-3">
-            <h2 className="text-lg font-light text-gray-900 tracking-tight">Recent Sales</h2>
-          </CardHeader>
-          <CardContent className="p-4">
-            {recentSales.length === 0 ? (
-              <p className="text-sm text-gray-500 py-4 text-center">No sales recorded yet.</p>
-            ) : (
-              <div className="space-y-2.5">
-                {recentSales.map((sale: any) => (
-                  <div key={sale.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div>
-                      <p className="font-bold text-gray-900">KES {sale.totalAmount.toLocaleString()}</p>
-                      <p className="text-xs text-gray-500">Cashier: {sale.cashier?.name || 'Staff'}</p>
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Recent Sales */}
+          <Card>
+            <CardHeader className="border-b border-gray-100 pb-3">
+              <h2 className="text-lg font-light text-gray-900 tracking-tight">Recent Sales</h2>
+            </CardHeader>
+            <CardContent className="p-4">
+              {recentSales.length === 0 ? (
+                <p className="text-sm text-gray-500 py-4 text-center">No sales recorded yet.</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {recentSales.map((sale: any) => (
+                    <div key={sale.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                      <div>
+                        <p className="font-bold text-gray-900">KES {sale.totalAmount.toLocaleString()}</p>
+                        <p className="text-xs text-gray-500">Cashier: {sale.cashier?.name || 'Staff'}</p>
+                      </div>
+                      <Badge variant="success">{sale.paymentMethod}</Badge>
                     </div>
-                    <Badge variant="success">{sale.paymentMethod}</Badge>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Activity Audit Feed */}
+          <Card>
+            <CardHeader className="border-b border-gray-100 pb-3 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-light text-gray-900 tracking-tight">Store Activity Log</h2>
+                <p className="text-xs text-gray-500">Live audit feed of staff & store events</p>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <Badge variant="info">{activityLogs.length} Events</Badge>
+            </CardHeader>
+            <CardContent className="p-4">
+              {activityLogs.length === 0 ? (
+                <p className="text-sm text-gray-500 py-4 text-center">No activity recorded yet.</p>
+              ) : (
+                <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
+                  {activityLogs.map((log: any) => (
+                    <div key={log.id} className="p-3 bg-gray-50 rounded-xl space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-gray-900">{log.user?.name || 'Staff'}</span>
+                        <Badge variant={getActionBadgeVariant(log.action)} className="text-[10px] uppercase">
+                          {log.action.replace(/_/g, ' ')}
+                        </Badge>
+                      </div>
+                      <p className="text-gray-600">{log.details}</p>
+                      <p className="text-[10px] text-gray-400">{new Date(log.createdAt).toLocaleString()}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </RequireRole>
   );

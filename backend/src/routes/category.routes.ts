@@ -5,6 +5,8 @@ import { authenticate, type AuthRequest } from '../middleware/auth.middleware.js
 import { requireBusinessPermission, requireBalePermission, requireCategoryPermission } from '../middleware/role.middleware.js';
 import { BusinessActions } from '../lib/permissions.js';
 
+import { logActivity } from '../lib/activityLog.lib.js';
+
 const router = Router({ mergeParams: true });
 router.use(authenticate);
 
@@ -63,6 +65,15 @@ router.post('/', requireBalePermission(BusinessActions.CATEGORIES_CREATE), async
         }),
       },
     });
+
+    logActivity({
+      businessId: bale.businessId,
+      userId: req.user!.userId,
+      action: canAutoApprove ? 'CATEGORY_CREATED_AND_APPROVED' : 'CATEGORY_PROPOSED',
+      details: `${canAutoApprove ? 'Created & approved' : 'Proposed'} stock category "${category.name}" (${quantity} pcs @ KES ${basePrice})`,
+      metadata: { categoryId: category.id, baleId, name: category.name, quantity, basePrice },
+    });
+
     res.status(201).json({ success: true, data: category });
   } catch (err: any) {
     res.status(500).json({ success: false, error: 'Failed to create category.', details: err?.message });
@@ -81,6 +92,15 @@ router.patch('/:id/approve', requireCategoryPermission(BusinessActions.CATEGORIE
         approvedAt: new Date(),
       },
     });
+
+    logActivity({
+      businessId: category.businessId,
+      userId: req.user!.userId,
+      action: 'CATEGORY_APPROVED',
+      details: `Approved stock category "${category.name}" for sale`,
+      metadata: { categoryId: category.id, name: category.name },
+    });
+
     res.json({ success: true, data: category });
   } catch (err: any) {
     res.status(500).json({ success: false, error: 'Failed to approve category.', details: err?.message });

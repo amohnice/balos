@@ -196,4 +196,7 @@ export const api = {
   dashboard: {
     get: (businessId: string) => apiRequest<unknown>(`/businesses/${businessId}/dashboard`),
   },
+  activityLogs: {
+    list: (businessId: string) => apiRequest<unknown[]>(`/businesses/${businessId}/activity-logs`),
+  },
 };

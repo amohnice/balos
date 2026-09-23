@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useActiveBusiness } from '@/contexts/ActiveBusinessContext';
 import { useToast } from '@/contexts/ToastContext';
 import { api } from '@/lib/api';
@@ -10,17 +10,23 @@ import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Spinner } from '@/components/ui/Spinner';
+import { Modal } from '@/components/ui/Modal';
 import RequireRole from '@/components/RequireRole';
 
 export default function NewSalePage() {
-  const { activeBusinessId: businessId } = useActiveBusiness();
+  const { activeBusinessId: businessId, activeBusiness } = useActiveBusiness();
   const { toast } = useToast();
   const [categories, setCategories] = useState<any[]>([]);
   const [cart, setCart] = useState<any[]>([]);
   const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [amountPaid, setAmountPaid] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+  const [completedSale, setCompletedSale] = useState<any | null>(null);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!businessId) {
@@ -40,6 +46,28 @@ export default function NewSalePage() {
         setLoading(false);
       });
   }, [businessId, toast]);
+
+  // Keyboard shortcuts listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // F2 or '/' to focus search bar
+      if (e.key === 'F2' || (e.key === '/' && document.activeElement?.tagName !== 'INPUT')) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Esc to clear cart or close mobile drawer
+      if (e.key === 'Escape') {
+        if (completedSale) {
+          setCompletedSale(null);
+        } else if (isMobileCartOpen) {
+          setIsMobileCartOpen(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [completedSale, isMobileCartOpen]);
 
   const addToCart = (category: any) => {
     const existing = cart.find((item) => item.categoryId === category.id);
@@ -104,12 +132,16 @@ export default function NewSalePage() {
     setCart(cart.filter((item) => item.categoryId !== categoryId));
   };
 
+  const total = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+  const paidNumber = parseFloat(amountPaid) || 0;
+  const change = Math.max(0, paidNumber - total);
+
   const handleSubmit = async () => {
     if (cart.length === 0 || !businessId) return;
     setSubmitting(true);
 
     try {
-      await api.sales.create(businessId, {
+      const res: any = await api.sales.create(businessId, {
         items: cart.map((item) => ({
           categoryId: item.categoryId,
           quantity: item.quantity,
@@ -117,7 +149,17 @@ export default function NewSalePage() {
         })),
         paymentMethod,
       });
+
+      const saleData = res.data;
+      setCompletedSale({
+        ...saleData,
+        amountPaid: paymentMethod === 'CASH' ? (paidNumber > 0 ? paidNumber : total) : total,
+        changeReturned: paymentMethod === 'CASH' ? change : 0,
+        businessName: activeBusiness?.name || 'Balos Mitumba',
+      });
+
       setCart([]);
+      setAmountPaid('');
       setIsMobileCartOpen(false);
       toast('Sale completed successfully!', 'success');
     } catch (err: any) {
@@ -127,7 +169,18 @@ export default function NewSalePage() {
     }
   };
 
-  const total = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+  const filteredCategories = categories.filter((cat) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      cat.name.toLowerCase().includes(q) ||
+      (cat.bale?.referenceNo && cat.bale.referenceNo.toLowerCase().includes(q))
+    );
+  });
+
+  const handlePrintReceipt = () => {
+    window.print();
+  };
 
   if (loading)
     return (
@@ -145,9 +198,15 @@ export default function NewSalePage() {
       fallback={<div className="p-4 text-gray-500">Insufficient permissions to create sales.</div>}
     >
       <div className="p-4 md:p-6 space-y-6 pb-24 md:pb-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-light text-gray-900 tracking-tight">Point of Sale (POS)</h1>
-          <Badge variant="default" className="text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-light text-gray-900 tracking-tight">Point of Sale (POS)</h1>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Press <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px]">F2</kbd> or{' '}
+              <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px]">/</kbd> to search items
+            </p>
+          </div>
+          <Badge variant="default" className="text-xs self-start sm:self-auto">
             {categories.length} Categories Available
           </Badge>
         </div>
@@ -155,24 +214,31 @@ export default function NewSalePage() {
         <div className="grid md:grid-cols-2 gap-6">
           {/* Categories Section */}
           <div className="space-y-4">
-            <h2 className="text-lg font-light text-gray-900 tracking-tight">Available Stock Items</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-light text-gray-900 tracking-tight">Stock Items</h2>
+              <Input
+                ref={searchInputRef}
+                placeholder="Search stock (F2)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                containerClassName="w-48 sm:w-64"
+                className="py-1 text-xs"
+              />
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
-              {categories.length === 0 ? (
-                <p className="text-gray-500 col-span-full py-8 text-center">
-                  No approved stock categories available for sale.
+              {filteredCategories.length === 0 ? (
+                <p className="text-gray-500 col-span-full py-8 text-center text-sm">
+                  {searchQuery ? `No items match "${searchQuery}"` : 'No approved stock categories available for sale.'}
                 </p>
               ) : (
-                categories.map((category) => (
+                filteredCategories.map((category) => (
                   <Card key={category.id} className="hover:shadow-md transition border-gray-200">
                     <CardContent className="p-4 flex flex-col justify-between h-full space-y-3">
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <p className="font-semibold text-gray-900 truncate">{category.name}</p>
-                          {category.status === 'CLEARANCE' && (
-                            <Badge variant="danger">
-                              CLEARANCE
-                            </Badge>
-                          )}
+                          {category.status === 'CLEARANCE' && <Badge variant="danger">CLEARANCE</Badge>}
                         </div>
                         <p className="text-xs text-gray-400">Ref: {category.bale?.referenceNo || 'Bale Item'}</p>
                         <p className="text-lg font-bold text-gray-900 mt-2">
@@ -201,7 +267,7 @@ export default function NewSalePage() {
                   </div>
                 ) : (
                   <>
-                    <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                    <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
                       {cart.map((item) => (
                         <div key={item.categoryId} className="p-3 bg-gray-50 rounded-xl space-y-2 border border-gray-100">
                           <div className="flex items-center justify-between">
@@ -257,6 +323,50 @@ export default function NewSalePage() {
                         <option value="MPESA">M-PESA</option>
                         <option value="CARD">Card</option>
                       </Select>
+
+                      {/* Cash Change Calculator */}
+                      {paymentMethod === 'CASH' && (
+                        <div className="p-3 bg-gray-50 rounded-xl space-y-2 border border-gray-200/80">
+                          <Input
+                            label="Cash Tendered (KES)"
+                            type="number"
+                            placeholder={`e.g. ${total}`}
+                            value={amountPaid}
+                            onChange={(e) => setAmountPaid(e.target.value)}
+                          />
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setAmountPaid(String(total))}
+                              className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs rounded font-medium transition"
+                            >
+                              Exact
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAmountPaid(String(Math.ceil(total / 500) * 500 || 500))}
+                              className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs rounded font-medium transition"
+                            >
+                              +500
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAmountPaid(String(Math.ceil(total / 1000) * 1000 || 1000))}
+                              className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs rounded font-medium transition"
+                            >
+                              +1,000
+                            </button>
+                          </div>
+                          {paidNumber > 0 && (
+                            <div className="flex justify-between items-center text-xs pt-1.5 border-t border-gray-200 font-semibold">
+                              <span className="text-gray-600">Change Return:</span>
+                              <span className={change >= 0 ? 'text-emerald-600 text-sm font-bold' : 'text-red-600'}>
+                                KES {change.toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       <Button className="w-full py-3 text-base font-medium" onClick={handleSubmit} disabled={submitting || cart.length === 0}>
                         {submitting ? 'Processing...' : 'Complete Sale'}
@@ -330,6 +440,70 @@ export default function NewSalePage() {
               </Button>
             </div>
           </div>
+        )}
+
+        {/* Printable Receipt Modal */}
+        {completedSale && (
+          <Modal isOpen={Boolean(completedSale)} onClose={() => setCompletedSale(null)} title="Sale Receipt">
+            <div className="space-y-4 text-sm" id="printable-receipt">
+              <div className="text-center border-b pb-3">
+                <h3 className="text-lg font-bold text-gray-900">{completedSale.businessName}</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Receipt #{completedSale.id?.slice(0, 8)}</p>
+                <p className="text-xs text-gray-400">{new Date(completedSale.createdAt).toLocaleString()}</p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="font-semibold text-xs text-gray-500 uppercase tracking-wider">Item Details</p>
+                {completedSale.items?.map((item: any) => (
+                  <div key={item.id} className="flex justify-between text-xs py-1 border-b border-gray-100">
+                    <div>
+                      <p className="font-medium text-gray-900">{item.category?.name || 'Stock Item'}</p>
+                      <p className="text-gray-400">
+                        {item.quantity} x KES {item.unitPrice.toLocaleString()}
+                      </p>
+                    </div>
+                    <p className="font-semibold text-gray-900">KES {item.totalPrice.toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2 border-t space-y-1.5 text-xs">
+                <div className="flex justify-between font-bold text-sm text-gray-900">
+                  <span>Total Paid:</span>
+                  <span>KES {completedSale.totalAmount?.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-gray-600">
+                  <span>Payment Method:</span>
+                  <span className="font-semibold text-gray-900">{completedSale.paymentMethod}</span>
+                </div>
+                {completedSale.paymentMethod === 'CASH' && (
+                  <>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Cash Tendered:</span>
+                      <span>KES {completedSale.amountPaid?.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-emerald-600">
+                      <span>Change Given:</span>
+                      <span>KES {completedSale.changeReturned?.toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between text-gray-500 pt-1">
+                  <span>Cashier:</span>
+                  <span>{completedSale.cashier?.name || 'Till Operator'}</span>
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-2">
+                <Button variant="secondary" className="flex-1" onClick={handlePrintReceipt}>
+                  🖨️ Print Receipt
+                </Button>
+                <Button className="flex-1" onClick={() => setCompletedSale(null)}>
+                  Next Customer
+                </Button>
+              </div>
+            </div>
+          </Modal>
         )}
       </div>
     </RequireRole>

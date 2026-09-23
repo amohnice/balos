@@ -5,6 +5,8 @@ import { authenticate, type AuthRequest } from '../middleware/auth.middleware.js
 import { requireBusinessPermission } from '../middleware/role.middleware.js';
 import { BusinessActions } from '../lib/permissions.js';
 
+import { logActivity } from '../lib/activityLog.lib.js';
+
 const router = Router({ mergeParams: true });
 router.use(authenticate);
 
@@ -99,6 +101,14 @@ router.post('/', requireBusinessPermission(BusinessActions.SALES_CREATE), async 
         items: { include: { category: { select: { id: true, name: true } } } },
         cashier: { select: { id: true, name: true } },
       },
+    });
+
+    logActivity({
+      businessId,
+      userId: req.user!.userId,
+      action: 'SALE_COMPLETED',
+      details: `Completed sale of KES ${totalAmount.toLocaleString()} (${items.length} item type(s)) via ${paymentMethod || 'CASH'}`,
+      metadata: { saleId: sale.id, totalAmount, paymentMethod: paymentMethod || 'CASH' },
     });
 
     res.status(201).json({ success: true, data: saleWithItems });

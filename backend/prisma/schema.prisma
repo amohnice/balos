@@ -58,6 +58,7 @@ model User {
 
   memberships  BusinessMember[]
   sales        Sale[]
+  activityLogs ActivityLog[]
 
   @@index([email])
 }
@@ -71,10 +72,11 @@ model Business {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  members     BusinessMember[]
-  suppliers   Supplier[]
-  bales       Bale[]
-  sales       Sale[]
+  members      BusinessMember[]
+  suppliers    Supplier[]
+  bales        Bale[]
+  sales        Sale[]
+  activityLogs ActivityLog[]
 
   @@index([name])
 }
@@ -207,4 +209,20 @@ model PriceMarkdown {
   category   BaleCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@index([categoryId])
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  businessId String
+  userId     String
+  action     String   // e.g. "SALE_COMPLETED", "CATEGORY_APPROVED", "BALE_CREATED", "MEMBER_ADDED"
+  details    String
+  metadata   String?  // JSON string
+  createdAt  DateTime @default(now())
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([userId])
 }
