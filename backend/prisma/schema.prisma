@@ -15,7 +15,7 @@ datasource db {
 enum SystemRole {
   SUPER_ADMIN
   OWNER
-  MEMBER
+  STAFF
 }
 
 enum BusinessRole {

@@ -8,7 +8,7 @@ Balos is a multi-tenant business management and Point of Sale (POS) system desig
 
 - **Multi-Shop Management**: Easily switch between and manage multiple business outlets or branches.
 - **Role-Based Access Control (RBAC)**:
-  - **Platform Roles**: `OWNER` (account creator), `MEMBER` (staff member).
+  - **Platform Roles**: `OWNER` (account creator), `STAFF` (staff member).
   - **Shop Roles**: `OWNER`, `MANAGER` (approvals & store operations), `SORTER` (bale opening & category creation), `CASHIER` (POS sales).
 - **Bale & Inventory Tracking**: Record purchases from suppliers, log weight & pricing, and manage bale status (`ARRIVED`, `SORTING`, `ACTIVE`, `CLEARED`).
 - **Sorting & Approval Workflow**:
