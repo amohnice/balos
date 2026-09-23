@@ -63,6 +63,8 @@ router.post('/', requireBusinessPermission(BusinessActions.SALES_CREATE), async 
     }
 
     // Create sale with items in transaction
+    const priceDeviations: string[] = [];
+
     const sale = await prisma.$transaction(async (tx) => {
       const newSale = await tx.sale.create({
         data: {
@@ -76,12 +78,16 @@ router.post('/', requireBusinessPermission(BusinessActions.SALES_CREATE), async 
 
       for (const item of items) {
         const { categoryId, quantity, unitPrice } = item;
+        const cat = await tx.baleCategory.findUnique({ where: { id: categoryId as string } });
+        const expectedPrice = cat?.currentPrice || unitPrice;
+
         await tx.saleItem.create({
           data: {
             saleId: newSale.id,
             categoryId: categoryId as string,
             quantity,
             unitPrice,
+            expectedPrice,
             totalPrice: quantity * unitPrice,
           },
         });
@@ -90,6 +96,13 @@ router.post('/', requireBusinessPermission(BusinessActions.SALES_CREATE), async 
           where: { id: categoryId as string },
           data: { soldCount: { increment: quantity } },
         });
+
+        const diff = unitPrice - expectedPrice;
+        if (diff > 0) {
+          priceDeviations.push(`"${cat?.name}": sold @ KES ${unitPrice} (+KES ${diff} above min price)`);
+        } else if (diff < 0) {
+          priceDeviations.push(`"${cat?.name}": sold @ KES ${unitPrice} (-KES ${Math.abs(diff)} discount)`);
+        }
       }
 
       return newSale;
@@ -107,8 +120,10 @@ router.post('/', requireBusinessPermission(BusinessActions.SALES_CREATE), async 
       businessId,
       userId: req.user!.userId,
       action: 'SALE_COMPLETED',
-      details: `Completed sale of KES ${totalAmount.toLocaleString()} (${items.length} item type(s)) via ${paymentMethod || 'CASH'}`,
-      metadata: { saleId: sale.id, totalAmount, paymentMethod: paymentMethod || 'CASH' },
+      details: `Completed sale of KES ${totalAmount.toLocaleString()} (${items.length} item type(s)) via ${paymentMethod || 'CASH'}${
+        priceDeviations.length > 0 ? ` [Price Override: ${priceDeviations.join('; ')}]` : ''
+      }`,
+      metadata: { saleId: sale.id, totalAmount, paymentMethod: paymentMethod || 'CASH', priceDeviations },
     });
 
     res.status(201).json({ success: true, data: saleWithItems });

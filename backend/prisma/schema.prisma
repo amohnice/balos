@@ -183,15 +183,16 @@ model Sale {
 }
 
 model SaleItem {
-  id          String       @id @default(uuid())
-  saleId      String
-  categoryId  String
-  quantity    Int          @default(1)
-  unitPrice   Float        // Actual sale price per unit
-  totalPrice  Float        // quantity * unitPrice
+  id            String       @id @default(uuid())
+  saleId        String
+  categoryId    String
+  quantity      Int          @default(1)
+  unitPrice     Float        // Actual sale price per unit
+  expectedPrice Float        @default(0) // Minimum/base price per unit at sale time
+  totalPrice    Float        // quantity * unitPrice
 
-  sale        Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  category    BaleCategory @relation(fields: [categoryId], references: [id])
+  sale          Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  category      BaleCategory @relation(fields: [categoryId], references: [id])
 
   @@index([saleId])
   @@index([categoryId])
